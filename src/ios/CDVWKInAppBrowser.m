@@ -1185,9 +1185,12 @@ BOOL isExiting = FALSE;
 // top of the screen.
 //
 - (UIEdgeInsets) getWindowSafeAreaInsets {
-    return IsAtLeastiOSVersion(@"11.0") ?
+    
+    /*return IsAtLeastiOSVersion(@"11.0") ?
             [[[UIApplication sharedApplication] delegate] window].safeAreaInsets :
-            UIEdgeInsetsMake([self getStatusBarOffset], 0, 0, 0);
+            UIEdgeInsetsMake([self getStatusBarOffset], 0, 0, 0);*/
+    //We need to show full screen as per ANB request
+    return UIEdgeInsetsMake(0, 0, 0, 0);
 }
 
 //
