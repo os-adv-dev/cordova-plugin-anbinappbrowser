@@ -1009,7 +1009,8 @@ BOOL viewRenderedAtLeastOneTime = FALSE;
 
 - (void)viewWillAppear:(BOOL)animated
 {
-    if (IsAtLeastiOSVersion(@"7.0") && !viewRenderedAtLeastOneTime) {
+    //We need to show full screen as per ANB request
+    /*if (IsAtLeastiOSVersion(@"7.0") && !viewRenderedAtLeastOneTime) {
         viewRenderedAtLeastOneTime = TRUE;
         
         if ([_browserOptions.toolbarposition isEqualToString:kInAppBrowserToolbarBarPositionTop]) {
@@ -1017,7 +1018,7 @@ BOOL viewRenderedAtLeastOneTime = FALSE;
         } else {
             [self positionViews:@[ self.webView, self.toolbar, self.addressLabel ]];
         }
-    }
+    }*/
     
     [super viewWillAppear:animated];
 }
