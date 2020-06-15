@@ -20,7 +20,8 @@ package org.apache.cordova.inappbrowser;
 
 import android.annotation.SuppressLint;
 import android.annotation.TargetApi;
-import android.content.ComponentName;
+import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -30,8 +31,6 @@ import android.provider.Browser;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
@@ -148,7 +147,6 @@ public class InAppBrowser extends CordovaPlugin {
     private ValueCallback<Uri> mUploadCallback;
     private ValueCallback<Uri[]> mUploadCallbackLollipop;
     private final static int FILECHOOSER_REQUESTCODE = 1;
-    private final static int FILECHOOSER_REQUESTCODE_LOLLIPOP = 2;
     private String closeButtonCaption = "";
     private String closeButtonColor = "";
     private boolean leftToRight = false;
@@ -161,7 +159,7 @@ public class InAppBrowser extends CordovaPlugin {
     private String beforeload = "";
     private String[] allowedSchemes;
     private InAppBrowserClient currentClient;
-    private String mCM;
+    private Uri mCMUri;
     private ValueCallback<Uri[]> filePathCallback;
 
     /**
@@ -1095,21 +1093,23 @@ public class InAppBrowser extends CordovaPlugin {
         }
         mUploadCallbackLollipop = filePathCallback;
         Intent takePictureIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
         if (takePictureIntent.resolveActivity(cordova.getActivity().getPackageManager()) != null) {
-            File photoFile = null;
+            Uri photoFileUri = null;
             try {
-                photoFile = createImageFile();
-                takePictureIntent.putExtra("PhotoPath", mCM);
+                photoFileUri = createImageFile();
+                takePictureIntent.putExtra("PhotoPath", mCMUri);
             } catch (IOException ex) {
                 Log.e(LOG_TAG, "Image file creation failed", ex);
             }
-            if (photoFile != null) {
-                mCM = "file:" + photoFile.getAbsolutePath();
-                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, Uri.fromFile(photoFile));
+            if (photoFileUri != null) {
+                mCMUri = photoFileUri;
+                takePictureIntent.putExtra(MediaStore.EXTRA_OUTPUT, photoFileUri);
             } else {
                 takePictureIntent = null;
             }
         }
+
         // Create File Chooser Intent
         Intent contentSelectionIntent = new Intent(Intent.ACTION_GET_CONTENT);
         contentSelectionIntent.addCategory(Intent.CATEGORY_OPENABLE);
@@ -1139,11 +1139,29 @@ public class InAppBrowser extends CordovaPlugin {
         cordova.startActivityForResult(InAppBrowser.this, chooserIntent, FILECHOOSER_REQUESTCODE);
     }
 
-    private File createImageFile() throws IOException{
-        @SuppressLint("SimpleDateFormat") String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
-        String imageFileName = "img_"+timeStamp+"_";
-        File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
-        return File.createTempFile(imageFileName,".jpg",storageDir);
+
+    private Uri createImageFile() throws IOException {
+
+        String timeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+
+        if (android.os.Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ContentResolver resolver = cordova.getContext().getContentResolver();
+            ContentValues contentValues = new ContentValues();
+
+            String imageFileName = "img_" + timeStamp + ".jpg";
+            contentValues.put(MediaStore.MediaColumns.DISPLAY_NAME, imageFileName);
+            contentValues.put(MediaStore.MediaColumns.MIME_TYPE, "image/jpg");
+            contentValues.put(MediaStore.MediaColumns.RELATIVE_PATH, Environment.DIRECTORY_PICTURES);
+            Uri uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, contentValues);
+
+            return uri;
+        } else {
+            String imageFileName = "img_" + timeStamp;
+            File storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+            File file = File.createTempFile(imageFileName, ".jpg", storageDir);
+
+            return Uri.fromFile(file);
+        }
     }
 
     /**
@@ -1192,8 +1210,8 @@ public class InAppBrowser extends CordovaPlugin {
                     }
                     if(intent == null || intent.getData() == null){
                         //Capture Photo if no image available
-                        if(mCM != null){
-                            results = new Uri[]{Uri.parse(mCM)};
+                        if (mCMUri != null){
+                            results = new Uri[]{mCMUri};
                         }
                     }else{
                         String dataString = intent.getDataString();
@@ -1204,6 +1222,7 @@ public class InAppBrowser extends CordovaPlugin {
                 }
             }
             mUploadCallbackLollipop.onReceiveValue(results);
+            mUploadCallbackLollipop = null;
         }
         // For Android < 5.0
         else {
